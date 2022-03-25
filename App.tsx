@@ -2,8 +2,10 @@ import React from 'react';
 import {Text, useColorScheme} from 'react-native';
 import {NavigationContainer, DefaultTheme} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
+import {Home} from './screens';
+import {RootStackParamList} from './types';
 
-const Stack = createStackNavigator();
+const Stack = createStackNavigator<RootStackParamList>();
 
 const theme = {
   ...DefaultTheme,
@@ -18,8 +20,10 @@ const App = () => {
 
   return (
     <NavigationContainer theme={theme}>
-      <Stack.Navigator screenOptions={{headerShown: false}}>
-        <Stack.Screen name="Home" component={() => <Text>Home</Text>} />
+      <Stack.Navigator
+        screenOptions={{headerShown: false}}
+        initialRouteName="Home">
+        <Stack.Screen name="Home" component={Home} />
       </Stack.Navigator>
     </NavigationContainer>
   );
