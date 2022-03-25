@@ -1,3 +1,5 @@
+import CategoriesSection from './CategoriesSection';
 import Header from './Header';
+import MyExpenses from './MyExpenses';
 
-export {Header};
+export {Header, MyExpenses, CategoriesSection};

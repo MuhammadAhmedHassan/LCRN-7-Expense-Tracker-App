@@ -22,7 +22,7 @@ const Header = () => {
       <Image
         source={icon}
         resizeMode="contain"
-        style={{height: 20, width: 20, tintColor: COLORS.black}}
+        style={{height: 20, width: 20, tintColor: COLORS.primary}}
       />
     </TouchableOpacity>
   );
