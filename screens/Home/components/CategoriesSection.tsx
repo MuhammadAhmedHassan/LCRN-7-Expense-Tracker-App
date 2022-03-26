@@ -3,6 +3,7 @@ import {
   FlatList,
   Image,
   ImageSourcePropType,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -11,23 +12,40 @@ import {
 import React, {useEffect, useRef, useState} from 'react';
 import {COLORS, dummyData, FONTS, icons, SIZES} from '../../../constants';
 import {VictoryPie} from 'victory-native';
+import {Svg} from 'react-native-svg';
 
 type CategoryType = 'List' | 'Chart';
 
 const CategoriesSection = () => {
-  const [selectedCategory, setSelectedCategory] =
+  const [selectedCategoryType, setSelectedCategoryType] =
     useState<CategoryType>('List');
+  const [categories, setCategories] = useState(dummyData.categoriesData);
+  const [selectedCategory, setSelectedCategory] = useState<ListItemType>(
+    categories[0],
+  );
 
-  const isList = selectedCategory === 'List';
+  const isList = selectedCategoryType === 'List';
   return (
     <View>
       <CategoryHeader
-        selected={selectedCategory}
-        setSelected={setSelectedCategory}
+        selected={selectedCategoryType}
+        setSelected={setSelectedCategoryType}
       />
 
-      {!isList && <RenderChart />}
-      {isList && <RenderList />}
+      {!isList && (
+        <RenderChart
+          categories={categories}
+          selectedCategory={selectedCategory}
+          setSelectedCategory={setSelectedCategory}
+        />
+      )}
+      {isList && (
+        <RenderList
+          categories={categories}
+          selectedCategory={selectedCategory}
+          setSelectedCategory={setSelectedCategory}
+        />
+      )}
     </View>
   );
 };
@@ -189,11 +207,17 @@ const ExpensesSection = ({selectedCategory}: IExpensesSection) => {
 
 type ListItemType = typeof dummyData.categoriesData[0];
 
-const RenderList = () => {
-  const [categories, setCategories] = useState(dummyData.categoriesData);
-  const [selectedCategory, setSelectedCategory] = useState<ListItemType>(
-    categories[0],
-  );
+interface IRenderList {
+  categories: typeof dummyData.categoriesData;
+  selectedCategory: ListItemType;
+  setSelectedCategory: (item: ListItemType) => void;
+}
+
+const RenderList = ({
+  categories,
+  selectedCategory,
+  setSelectedCategory,
+}: IRenderList) => {
   const [showMoreToggle, setShowMoreToggle] = useState(false);
   const categoryListHeightAnimationValue = useRef(
     new Animated.Value(115),
@@ -275,17 +299,203 @@ const RenderList = () => {
   );
 };
 
-const RenderChart = () => {
+interface IRenderChart {
+  categories: typeof dummyData.categoriesData;
+  selectedCategory: ListItemType;
+  setSelectedCategory: (item: ListItemType) => void;
+}
+
+const RenderChart = ({
+  selectedCategory,
+  setSelectedCategory,
+  categories,
+}: IRenderChart) => {
+  const isIOS = Platform.OS === 'ios';
+  const setSelectCategoryByName = (name: string) => {
+    let category = categories.find(a => a.name == name);
+    if (category) setSelectedCategory(category);
+  };
+  const processChartData = () => {
+    const chartData = dummyData.categoriesData.map(item => {
+      const confirmExpenses = item.expenses.filter(
+        a => a.status === dummyData.confirmStatus,
+      );
+      const total = confirmExpenses.reduce((a, b) => a + (b.total || 0), 0);
+
+      return {
+        name: item.name,
+        y: total,
+        expenseCount: confirmExpenses.length,
+        color: item.color,
+        id: item.id,
+      };
+    });
+
+    // filter out categories with no data/expenses
+    const filterChartData = chartData.filter(a => a.y > 0);
+
+    // Calculate the total expenses
+    const totalExpense = filterChartData.reduce((a, b) => a + (b.y || 0), 0);
+
+    // Calculate percentage and repopulate chart data
+    const finalChartData = filterChartData.map(item => {
+      const percentage = ((item.y / totalExpense) * 100).toFixed(0);
+      return {
+        label: `${percentage}%`,
+        ...item,
+      };
+    });
+
+    return finalChartData;
+  };
+
+  const chartData = processChartData();
+  const colorScales = chartData.map(item => item.color);
+  const totalExpenseCount = chartData.reduce(
+    (a, b) => a + (b.expenseCount || 0),
+    0,
+  );
+
+  console.log('check chart data');
+  console.log(chartData);
+
+  const getPieChar = () => {
+    return (
+      <VictoryPie
+        data={chartData}
+        labels={datum => `${datum.y}`}
+        radius={({datum}) =>
+          selectedCategory.name === datum.name
+            ? SIZES.width * 0.4
+            : SIZES.width * 0.4 - 10
+        }
+        innerRadius={70}
+        labelRadius={({innerRadius}) => {
+          if (typeof innerRadius === 'number')
+            return (SIZES.width * 0.4 + innerRadius) / 2.5;
+          return (SIZES.width * 0.4 + 0) / 2.5;
+        }}
+        style={{
+          labels: {fill: 'white', ...FONTS.body3},
+          parent: {
+            boxShadow: '2px 2px 3.84px rgba(0, 0, 0, .25)',
+          },
+        }}
+        width={SIZES.width * 0.8}
+        height={SIZES.width * 0.8}
+        colorScale={colorScales}
+        events={[
+          {
+            target: 'data',
+            eventHandlers: {
+              onPress: () => {
+                return [
+                  {
+                    target: 'labels',
+                    mutation: props => {
+                      let categoryName = chartData[props.index].name;
+                      setSelectCategoryByName(categoryName);
+                    },
+                  },
+                ];
+              },
+            },
+          },
+        ]}
+      />
+    );
+  };
+
   return (
-    <VictoryPie
-      padAngle={({datum}) => datum.y}
-      innerRadius={100}
-      data={[
-        {x: 1, y: 2, label: 'one'},
-        {x: 2, y: 3, label: 'two'},
-        {x: 3, y: 5, label: 'three'},
-      ]}
-    />
+    <View>
+      <View style={{alignItems: 'center', justifyContent: 'center'}}>
+        {getPieChar()}
+        {/* {isIOS ? (
+        getPieChar()
+      ) : (
+        <Svg
+          width={SIZES.width}
+          // height={SIZES.width}
+          style={{}}>
+          {getPieChar()}
+        </Svg>
+      )} */}
+        <View style={{position: 'absolute', top: '42%', left: '42%'}}>
+          <Text style={{...FONTS.h1, textAlign: 'center'}}>
+            {totalExpenseCount}
+          </Text>
+          <Text style={{...FONTS.body3, textAlign: 'center'}}>Expenses</Text>
+        </View>
+      </View>
+
+      <View style={{padding: SIZES.padding}}>
+        <FlatList
+          scrollEnabled={false}
+          pagingEnabled={false}
+          data={chartData}
+          renderItem={({item, index}) => (
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                height: 40,
+                paddingHorizontal: SIZES.radius,
+                borderRadius: 10,
+                backgroundColor:
+                  selectedCategory && selectedCategory.name == item.name
+                    ? item.color
+                    : COLORS.white,
+              }}
+              onPress={() => {
+                let categoryName = item.name;
+                setSelectCategoryByName(categoryName);
+              }}>
+              {/* Name/Category */}
+              <View
+                style={{flex: 1, flexDirection: 'row', alignItems: 'center'}}>
+                <View
+                  style={{
+                    width: 20,
+                    height: 20,
+                    backgroundColor:
+                      selectedCategory && selectedCategory.name == item.name
+                        ? COLORS.white
+                        : item.color,
+                    borderRadius: 5,
+                  }}
+                />
+
+                <Text
+                  style={{
+                    marginLeft: SIZES.base,
+                    color:
+                      selectedCategory && selectedCategory.name == item.name
+                        ? COLORS.white
+                        : COLORS.primary,
+                    ...FONTS.h3,
+                  }}>
+                  {item.name}
+                </Text>
+              </View>
+
+              {/* Expenses */}
+              <View style={{justifyContent: 'center'}}>
+                <Text
+                  style={{
+                    color:
+                      selectedCategory && selectedCategory.name == item.name
+                        ? COLORS.white
+                        : COLORS.primary,
+                    ...FONTS.h3,
+                  }}>
+                  {item.y} USD - {item.label}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          keyExtractor={item => `${item.id}`}
+        />
+      </View>
+    </View>
   );
 };
 
